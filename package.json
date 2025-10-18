@@ -1,0 +1,33 @@
+{
+  "name": "zfetcher",
+  "description": "A super lightweight fetch wrapper to save you time",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/johntheZ/zfetcher"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "fetch",
+    "wrapper",
+    "lightweight"
+  ],
+  "author": {
+    "name": "johntheZ",
+    "email": "me@zzhang.dev",
+    "url": "https://zzhang.dev"
+  },
+  "license": "MIT"
+}

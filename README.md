@@ -1,2 +1,2 @@
 # zFetcher
-A lightweight fetcher constructor. 
+A super lightweight fetch wrapper to save you time.
