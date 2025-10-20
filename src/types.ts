@@ -1,7 +1,7 @@
 export type ZFetcherOptions = {
     endpoint?: string;
     method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-    query?: Record<string, string | number | boolean>;
+    query?: Record<string, string | number | boolean | undefined>;
     data?: any;
     headers?: Record<string, string>;
     onPrep?: () => Promise<void> | void;
