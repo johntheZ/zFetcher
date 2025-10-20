@@ -3,6 +3,9 @@
   "workspaces": {
     "": {
       "name": "zfetcher",
+      "dependencies": {
+        "zfetcher": "^0.0.3",
+      },
       "devDependencies": {
         "@types/bun": "latest",
       },
@@ -25,5 +28,7 @@
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "undici-types": ["undici-types@7.14.0", "", {}, "sha512-QQiYxHuyZ9gQUIrmPo3IA+hUl4KYk8uSA7cHrcKd/l3p1OTpZcM0Tbp9x7FAtXdAYhlasd60ncPpgu6ihG6TOA=="],
+
+    "zfetcher": ["zfetcher@0.0.3", "", { "peerDependencies": { "typescript": "^5.9.3" } }, "sha512-YFE/q5/vJewkRvv4bwdgPlgfYhyRBK9lXzmYo6xthUsIzY0wV0fasKmk/c3ggRh/ElQrH/aC+kcmh/QtK3VatA=="],
   }
 }

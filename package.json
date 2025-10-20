@@ -29,5 +29,8 @@
     "email": "me@zzhang.dev",
     "url": "https://zzhang.dev"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "zfetcher": "^0.0.3"
+  }
 }

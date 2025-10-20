@@ -21,10 +21,16 @@ export function createZFetcher(config: ZFetcherConfig) {
         } = options;
 
         const mergedQuery = { ...defaultQuery, ...query };
-        const queryString =
-            Object.keys(mergedQuery).length > 0
-                ? "?" + new URLSearchParams(mergedQuery as Record<string, string>).toString()
-                : "";
+        const queryString = mergedQuery
+            ? (() => {
+                const filteredEntries = Object.entries(mergedQuery).filter(
+                    ([, value]) => value !== undefined
+                );
+                return filteredEntries.length > 0
+                    ? "?" + new URLSearchParams(filteredEntries as [string, string][]).toString()
+                    : "";
+            })()
+            : "";
 
         const fullUrl = `${baseUrl}${endpoint}${queryString}`;
         // const fullUrl = `${baseUrl.replace(/\/+$/, "")}/${endpoint.replace(/^\/+/, "")}${queryString}`;
