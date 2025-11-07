@@ -42,9 +42,8 @@ export function createZFetcher(config: ZFetcherConfig) {
         onSettled: defaultOnSettled,
     } = config;
 
-    async function fetcher<T = any>(options: ZFetcherOptions): Promise<T | string> {
+    async function fetcher<T = any>(endpoint: string = "", options?: ZFetcherOptions): Promise<T | string> {
         const {
-            endpoint = "",
             method = "GET",
             headers,
             queryParams,
@@ -76,7 +75,7 @@ export function createZFetcher(config: ZFetcherConfig) {
             onNotOk,
             onError,
             onSettled,
-        } = options;
+        } = options || {};
 
         const mergedQuery = {
             ...(disableDefaultQueryParams ? {} : defaultQueryParams),
@@ -152,15 +151,20 @@ export function createZFetcher(config: ZFetcherConfig) {
 
     return {
         fetch: fetcher,
-        get: <T = any>(options: Omit<ZFetcherOptions, 'method'>) =>
-            fetcher<T>({ ...options, method: 'GET' }),
-        post: <T = any>(options: Omit<ZFetcherOptions, 'method'>) =>
-            fetcher<T>({ ...options, method: 'POST' }),
-        put: <T = any>(options: Omit<ZFetcherOptions, 'method'>) =>
-            fetcher<T>({ ...options, method: 'PUT' }),
-        patch: <T = any>(options: Omit<ZFetcherOptions, 'method'>) =>
-            fetcher<T>({ ...options, method: 'PATCH' }),
-        delete: <T = any>(options: Omit<ZFetcherOptions, 'method'>) =>
-            fetcher<T>({ ...options, method: 'DELETE' }),
+        get<T = any>(endpoint: string, options?: Omit<ZFetcherOptions, 'method'>) {
+            return fetcher<T>(endpoint, { ...options, method: 'GET' })
+        },
+        post<T = any>(endpoint: string, options?: Omit<ZFetcherOptions, 'method'>) {
+            return fetcher<T>(endpoint, { ...options, method: 'POST' })
+        },
+        put<T = any>(endpoint: string, options?: Omit<ZFetcherOptions, 'method'>) {
+            return fetcher<T>(endpoint, { ...options, method: 'PUT' })
+        },
+        patch<T = any>(endpoint: string, options?: Omit<ZFetcherOptions, 'method'>) {
+            return fetcher<T>(endpoint, { ...options, method: 'PATCH' })
+        },
+        delete<T = any>(endpoint: string, options?: Omit<ZFetcherOptions, 'method'>) {
+            return fetcher<T>(endpoint, { ...options, method: 'DELETE' })
+        },
     };
 }
