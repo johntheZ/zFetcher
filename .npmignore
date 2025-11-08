@@ -1,6 +1,8 @@
 /src
 /node_modules
 
+test.ts
+
 bun.lock
 bun.lockb
 .DS_Store

@@ -2,12 +2,13 @@
     "compilerOptions": {
         "strict": true,
         "noImplicitAny": true,
-        "target": "es2022", /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
-        "module": "node16", /* Specify what module code is generated. */
+        "target": "ESNext",
+        "module": "esnext",
+        "moduleResolution": "node",
         "outDir": "dist",
         "declaration": true,
+        "declarationDir": "dist/types",
         "esModuleInterop": true,
-        "moduleResolution": "node16",
         "skipLibCheck": true
     },
     "include": [
