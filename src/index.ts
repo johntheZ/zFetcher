@@ -1,2 +1,2 @@
-export * from "./types";
-export * from "./zfetcher";
+export * from "./types.js";
+export * from "./zfetcher.js";
