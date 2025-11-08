@@ -9,9 +9,54 @@ export type RequestProtocol = "http" | "https" | "ws" | "wss" | "data" | "file";
 export type RequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 /**
+ * Lifecycle hook handlers shared between config and options.
+ */
+export interface LifecycleHooks {
+    /**
+     * Invoked before the request is sent.
+     * Useful for logging
+     */
+    onPrep?: () => Promise<void> | void;
+
+    /**
+     * Invoked when the request completes successfully (HTTP 2xx).
+     * Return a value to transform the response body.
+     */
+    onSuccess?: (response: Response, body: unknown) => Promise<unknown | void> | unknown | void;
+
+    /**
+     * Invoked when the response status is not OK (non-2xx).
+     * Return a value to transform the response body.
+     */
+    onNotOk?: (response: Response, body: unknown) => Promise<unknown | void> | unknown | void;
+
+    /**
+     * Invoked when an error occurs during the request or response handling.
+     * Return a value to prevent the error from being thrown and use that value as the response.
+     */
+    onError?: (error: unknown) => Promise<unknown> | unknown;
+
+    /**
+     * Invoked after the request lifecycle completes, regardless of outcome.
+     */
+    onSettled?: () => Promise<void> | void;
+}
+
+/**
+ * Flags to disable default lifecycle hooks.
+ */
+export interface DisableDefaultHooks {
+    disableDefaultOnPrep?: boolean;
+    disableDefaultOnSuccess?: boolean;
+    disableDefaultOnNotOk?: boolean;
+    disableDefaultOnError?: boolean;
+    disableDefaultOnSettled?: boolean;
+}
+
+/**
  * Configuration options for initializing a ZFetcher instance.
  */
-export interface ZFetcherConfig {
+export interface ZFetcherConfig extends LifecycleHooks {
     /**
      * The default base URL for all requests.
      */
@@ -20,9 +65,15 @@ export interface ZFetcherConfig {
     /**
      * Automatically normalizes URLs by ensuring proper slashes.
      * If disabled, url, path, and query params are concatenated literally.
-     * @default true
+     * @default false
      */
     normalizeUrl?: boolean;
+
+    /**
+     * Throw ResponseError when response.ok is false.
+     * @default true
+     */
+    throwNotOk?: boolean;
 
     /**
      * Headers that will always be attached to each request unless explicitly disabled.
@@ -36,100 +87,15 @@ export interface ZFetcherConfig {
 
     /**
      * Default Fetch API options applied to every request unless explicitly disabled.
-     * @default  credentials: "include" 
+     * default { credentials: "include" }
      */
-    fetchOptions?: RequestInit;
-
-    // --- Default Lifecycle Hooks ---
-
-    /**
-     * Invoked before the request is sent.
-     * Useful for logging, modifying headers, or preparing data.
-     * Can be disabled
-     */
-    onPrep?: () => Promise<void> | void;
-
-    /**
-     * Invoked when the request completes successfully (HTTP 2xx).
-     * Can be disabled
-     */
-    onSuccess?: (response: Response) => Promise<void> | void;
-
-    /**
-     * Invoked when the response status is not OK (non-2xx).
-     * Can be disabled
-     */
-    onNotOk?: (response: Response) => Promise<void> | void;
-
-    /**
-     * Invoked when an error occurs during the request or response handling.
-     * Returning a value will prevent the error from being thrown further.
-     * Can be disabled
-     */
-    onError?: (error: any) => Promise<any> | any;
-
-    /**
-     * Invoked after the request lifecycle completes, regardless of outcome.
-     * Can be disabled
-     */
-    onSettled?: () => Promise<void> | void;
+    fetchOptions?: Omit<RequestInit, 'headers'>;
 }
 
 /**
  * Options for individual ZFetcher requests.
  */
-export interface ZFetcherOptions {
-    /**
-     * The request body payload. Can be any valid JSON or raw data.
-     */
-    body?: any;
-
-    /**
-     * The delay (in milliseconds) before executing the request.
-     */
-    delay?: number;
-
-    /**
-     * Whether to disable default fetch options defined in `ZFetcherConfig`.
-     */
-    disableDefaultFetchOptions?: boolean;
-
-    /**
-     * Whether to disable default headers defined in `ZFetcherConfig`.
-     */
-    disableDefaultHeaders?: boolean;
-
-    /**
-     * Whether to disable default query parameters defined in `ZFetcherConfig`.
-     */
-    disableDefaultQueryParams?: boolean;
-
-    disableDefaultOnPrep?: boolean;
-    disableDefaultOnSuccess?: boolean;
-    disableDefaultOnNotOk?: boolean;
-    disableDefaultOnError?: boolean;
-    disableDefaultOnSettled?: boolean;
-
-    /**
-     * Optional endpoint path appended to the base URL.
-     */
-    endpoint?: string;
-
-    /**
-     * Additional fetch options for this request.
-     */
-    fetchOptions?: RequestInit;
-
-    /**
-     * Additional headers for this specific request.
-     */
-    headers?: Record<string, string>;
-
-    /**
-     * IP address to target instead of using the default domain.
-     */
-    ip?: string;
-
+export interface ZFetcherOptions extends LifecycleHooks, DisableDefaultHooks {
     /**
      * HTTP request method.
      * @default "GET"
@@ -137,29 +103,14 @@ export interface ZFetcherOptions {
     method?: RequestMethod;
 
     /**
-     * Enables mock mode to bypass real network requests.
+     * The request body payload. Can be any valid JSON or raw data.
      */
-    mock?: boolean;
+    body?: any;
 
     /**
-     * The mock data to return when `mock` mode is enabled.
+     * Additional headers for this specific request.
      */
-    mockData?: any;
-
-    /**
-     * The mock data to return when `mock` mode is enabled.
-     */
-    mockResponse?: Response;
-
-    /**
-     * Port number to use when forming the request URL.
-     */
-    port?: string;
-
-    /**
-     * The request protocol.
-     */
-    protocol?: RequestProtocol;
+    headers?: Record<string, string>;
 
     /**
      * Query parameters specific to this request.
@@ -167,38 +118,68 @@ export interface ZFetcherOptions {
     queryParams?: Record<string, any>;
 
     /**
-     * The fully qualified URL to use for this request (overrides `endpoint` and `defaultUrl`).
+     * Additional fetch options for this request.
+     */
+    fetchOptions?: Omit<RequestInit, 'method' | 'headers' | 'body'>;
+
+    /**
+     * The fully qualified URL to use for this request (overrides base URL).
      */
     url?: string;
 
-    normalizeUrl?: string;
-
-    // --- Lifecycle Hooks ---
+    /**
+     * Automatically normalizes URLs by ensuring proper slashes.
+     * Overrides the default normalizeUrl setting.
+     */
+    normalizeUrl?: boolean;
 
     /**
-     * Invoked before the request is sent.
-     * Useful for logging, modifying headers, or preparing data.
+     * Throw ResponseError when response.ok is false.
+     * Overrides the default throwNotOk setting.
      */
-    onPrep?: () => Promise<void> | void;
+    throwNotOk?: boolean;
 
     /**
-     * Invoked when the request completes successfully (HTTP 2xx).
+     * The delay (in milliseconds) before executing the request.
      */
-    onSuccess?: (response: Response) => Promise<void> | void;
+    delay?: number;
 
     /**
-     * Invoked when the response status is not OK (non-2xx).
+     * Mock function to construct the response (for testing).
+     * When provided, the actual fetch is skipped.
      */
-    onNotOk?: (response: Response) => Promise<void> | void;
+    mockFn?: () => Promise<Response> | Response;
 
     /**
-     * Invoked when an error occurs during the request or response handling.
-     * Returning a value will prevent the error from being thrown further.
+     * Whether to disable default fetch options defined in ZFetcherConfig.
      */
-    onError?: (error: any) => Promise<any> | any;
+    disableDefaultFetchOptions?: boolean;
 
     /**
-     * Invoked after the request lifecycle completes, regardless of outcome.
+     * Whether to disable default headers defined in ZFetcherConfig.
      */
-    onSettled?: () => Promise<void> | void;
+    disableDefaultHeaders?: boolean;
+
+    /**
+     * Whether to disable default query parameters defined in ZFetcherConfig.
+     */
+    disableDefaultQueryParams?: boolean;
+
+    // --- Unused/Future features ---
+    // These are kept for backward compatibility but not yet implemented
+
+    /**
+     * @deprecated Not yet implemented
+     */
+    protocol?: RequestProtocol;
+
+    /**
+     * @deprecated Not yet implemented
+     */
+    ip?: string;
+
+    /**
+     * @deprecated Not yet implemented
+     */
+    port?: string;
 }

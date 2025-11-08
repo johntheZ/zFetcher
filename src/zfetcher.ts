@@ -1,6 +1,44 @@
 import { ZFetcherConfig, ZFetcherOptions } from "./types.js";
 import { prepareRequestBody } from "./util.js";
 
+export class ResponseError extends Error {
+    readonly response: Response;
+    readonly status: number;
+    readonly statusText: string;
+    readonly headers: Headers;
+    readonly body?: unknown;
+
+    constructor(response: Response, body?: unknown) {
+        super("ResponseError");
+        this.name = "ResponseError";
+        this.response = response;
+        this.status = response.status;
+        this.statusText = response.statusText;
+        this.headers = response.headers;
+        this.body = body;
+
+        Object.setPrototypeOf(this, ResponseError.prototype);
+    }
+}
+
+export class NetworkError extends Error {
+    readonly cause: unknown;
+    readonly originalError: Error;
+
+    constructor(message = "Network request failed", originalError: unknown) {
+        super(message);
+        this.name = "NetworkError";
+        this.originalError = originalError as Error;
+        this.cause = originalError;
+
+        if (originalError instanceof Error) {
+            this.stack = originalError.stack;
+        }
+
+        Object.setPrototypeOf(this, NetworkError.prototype);
+    }
+}
+
 export function buildQueryString(query: Record<string, any> = {}): string {
     const searchParams = new URLSearchParams();
 
@@ -35,6 +73,7 @@ export function createZFetcher(config: ZFetcherConfig) {
             credentials: 'include'
         },
         normalizeUrl: defaultNormalizeUrl,
+        throwNotOk: defaultThrowNotOk = true,
         onPrep: defaultOnPrep,
         onSuccess: defaultOnSuccess,
         onError: defaultOnError,
@@ -42,7 +81,7 @@ export function createZFetcher(config: ZFetcherConfig) {
         onSettled: defaultOnSettled,
     } = config;
 
-    async function fetcher<T = any>(endpoint: string = "", options?: ZFetcherOptions): Promise<T | string> {
+    async function fetcher<T = unknown>(endpoint: string = "", options?: ZFetcherOptions): Promise<T | unknown> {
         const {
             method = "GET",
             headers,
@@ -50,13 +89,12 @@ export function createZFetcher(config: ZFetcherConfig) {
             body,
 
             delay,
-            mock,
-            mockData,
-            mockResponse,
+            mockFn,
             fetchOptions,
 
             url,
             normalizeUrl,
+            throwNotOk,
             protocol,
             ip,
             port,
@@ -77,76 +115,114 @@ export function createZFetcher(config: ZFetcherConfig) {
             onSettled,
         } = options || {};
 
-        const mergedQuery = {
+        const shouldThrowNotOk = throwNotOk !== undefined ? throwNotOk : defaultThrowNotOk;
+
+        const mergedHeaders = {
+            ...(disableDefaultHeaders ? {} : defaultHeaders),
+            ...headers,
+        }
+        const mergedFetchOptions = {
+            ...(disableDefaultFetchOptions ? {} : defaultFetchOptions),
+            ...fetchOptions,
+        }
+        const mergedQueryParams = {
             ...(disableDefaultQueryParams ? {} : defaultQueryParams),
             ...queryParams,
         };
-        const queryString = buildQueryString(mergedQuery);
+
+        const queryString = buildQueryString(mergedQueryParams);
 
         let fullUrl = url || defaultUrl + endpoint + queryString;
         if (normalizeUrl || defaultNormalizeUrl) {
             fullUrl = buildUrl(url || defaultUrl, endpoint, queryString)
         }
 
+        let response: Response | undefined;
+        let processedBody: unknown;
+
+        if (defaultOnPrep && !disableDefaultOnPrep) await defaultOnPrep();
+        if (onPrep) await onPrep();
+
+        if (delay) await new Promise((res) => setTimeout(res, delay));
+
         try {
-            if (defaultOnPrep && !disableDefaultOnPrep) await defaultOnPrep();
-            if (onPrep) await onPrep();
-
-            if (delay) await new Promise((res) => setTimeout(res, delay));
-
-            if (mock) {
-                const res = mockResponse || new Response(JSON.stringify(mockData), {
-                    status: 200, headers: {
-                        "Content-Type": "application/json",
-                    }
-                })
-                if (defaultOnSuccess && !disableDefaultOnSuccess) await defaultOnSuccess(res);
-                if (onSuccess) await onSuccess(res);
-                return mockData
-            }
-
-            const response = await fetch(fullUrl, {
-                method,
-                headers: {
-                    ...(disableDefaultHeaders ? {} : defaultHeaders),
-                    ...headers,
-                },
-                ...(method !== "GET" && body && {
-                    body: prepareRequestBody(body),
-                }),
-                ...(disableDefaultFetchOptions ? {} : defaultFetchOptions),
-                ...fetchOptions,
-            });
-
-            if (response.ok) {
-                if (defaultOnSuccess && !disableDefaultOnSuccess) await defaultOnSuccess(response);
-                if (onSuccess) await onSuccess(response);
+            if (mockFn) {
+                response = await mockFn()
             } else {
-                if (defaultOnNotOk && !disableDefaultOnNotOk) await defaultOnNotOk(response);
-                if (onNotOk) await onNotOk(response);
+                response = await fetch(fullUrl, {
+                    method,
+                    headers: mergedHeaders,
+                    ...(method !== "GET" && body && {
+                        body: prepareRequestBody(body),
+                    }),
+                    ...mergedFetchOptions
+                });
             }
-
-            const contentLength = response.headers.get("content-length");
-            if (response.status === 204 || contentLength === "0") return String(response.status);
-
-            const contentType = response.headers.get("content-type");
-            return contentType && contentType.includes("application/json")
-                ? await response.json()
-                : await response.text();
-        } catch (err: any) {
-            if (defaultOnError && !disableDefaultOnError) {
-                const handledValue = await defaultOnError(err);
-                if (handledValue !== undefined) return handledValue;
-            }
+        } catch (err: unknown) {
+            let onErrorRet;
+            let defaultOnErrorRet;
             if (onError) {
-                const handledValue = await onError(err);
-                if (handledValue !== undefined) return handledValue;
+                onErrorRet = await onError(err);
             }
-            throw err;
-        } finally {
+            if (defaultOnError && !disableDefaultOnError) {
+                defaultOnErrorRet = await defaultOnError(err);
+            }
+
             if (defaultOnSettled && !disableDefaultOnSettled) await defaultOnSettled();
             if (onSettled) await onSettled();
+
+            if (onErrorRet !== undefined) return onErrorRet;
+            if (defaultOnErrorRet !== undefined) return defaultOnErrorRet;
+            throw new NetworkError("Network request failed", err);
         }
+
+        const contentLength = response.headers.get("content-length");
+        if (response.status === 204 || contentLength === "0") {
+            processedBody = null;
+        } else {
+            const contentType = response.headers.get("content-type");
+            processedBody = contentType && contentType.toLowerCase().includes("json")
+                ? await response.json()
+                : await response.text();
+        }
+
+        const beforeHandle = processedBody;
+        if (response.ok) {
+            if (defaultOnSuccess && !disableDefaultOnSuccess) {
+                const handledValue = await defaultOnSuccess(response, beforeHandle);
+                if (handledValue !== undefined) {
+                    processedBody = handledValue
+                }
+            }
+            if (onSuccess) {
+                const handledValue = await onSuccess(response, beforeHandle);
+                if (handledValue !== undefined) {
+                    processedBody = handledValue
+                }
+            }
+        } else {
+            if (defaultOnNotOk && !disableDefaultOnNotOk) {
+                const handledValue = await defaultOnNotOk(response, beforeHandle);
+                if (handledValue !== undefined) {
+                    processedBody = handledValue
+                }
+            }
+            if (onNotOk) {
+                const handledValue = await onNotOk(response, beforeHandle);
+                if (handledValue !== undefined) {
+                    processedBody = handledValue
+                }
+            }
+        }
+
+        if (defaultOnSettled && !disableDefaultOnSettled) await defaultOnSettled();
+        if (onSettled) await onSettled();
+
+        if (!response.ok && shouldThrowNotOk) {
+            throw new ResponseError(response, processedBody)
+        }
+
+        return processedBody;
     }
 
     return {
@@ -168,3 +244,59 @@ export function createZFetcher(config: ZFetcherConfig) {
         },
     };
 }
+
+// onPrep returns nothing.
+// onSettled returns nothing.
+// onSuccess takes: original response obj, parsed response body
+// onNotOk takes: original response obj, parsed response body
+// onError takes: NetworkError obj,
+
+/**
+ * Case 1: Response with 2xx,
+ * 
+ * onPrep, onSuccess, onSettled will run.
+ * 
+ * onSuccess takes:
+ *  original response obj,
+ *  parsed response body
+ * 
+ * Fetcher return either:
+ *  parsed response body,
+ *  whatever onSuccess returns
+ * 
+ * Fetcher throw error:
+ *  Never
+ */
+
+/**
+ * Case 2: Response with non-2xx,
+ * 
+ * onPrep, onNotOk, onSettled will run.
+ * 
+ * onNotOk takes:
+ *  original response obj,
+ *  parsed response body
+ * 
+ * Fetcher return (`throwOnNotOk = false`) either:
+ *  parsed response body,
+ *  whatever onNotOk returns,
+ * 
+ * Fetcher throw error (`throwOnNotOk = true`):
+ *  ResponseError
+ */
+
+
+/**
+ * Case 3: Fetch throws Error
+ * 
+ * onPrep, onError, onSettled will run.
+ * 
+ * onError takes:
+ *  NetworkError obj,
+ * 
+ * Fetcher return (onError returns):
+ *  whatever onError returns
+ * 
+ * Fetcher throw error (onError does not handle, i.e returns undefine):
+ *  NetworkError
+ */
