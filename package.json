@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf /dist"
+    "clean": "rm -rf ./dist"
   },
   "repository": {
     "type": "git",
