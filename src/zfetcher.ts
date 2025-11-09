@@ -7,6 +7,7 @@ export class ResponseError extends Error {
     readonly statusText: string;
     readonly headers: Headers;
     readonly body?: unknown;
+    readonly notOk = true;
 
     constructor(response: Response, body?: unknown) {
         super("ResponseError");
