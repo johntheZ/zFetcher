@@ -91,8 +91,8 @@ export function createZFetcher(config: ZFetcherConfig) {
             onSettled,
         } = options || {};
 
-        if (defaultOnPrep && !disableDefaultOnPrep) await defaultOnPrep();
         if (onPrep) await onPrep();
+        if (defaultOnPrep && !disableDefaultOnPrep) await defaultOnPrep();
 
         const mergedFetchOptions = {
             ...(disableDefaultFetchOptions ? {} : defaultFetchOptions),
@@ -142,8 +142,8 @@ export function createZFetcher(config: ZFetcherConfig) {
                     defaultOnErrorRet = await defaultOnError(err);
                 }
             } finally {
-                if (defaultOnSettled && !disableDefaultOnSettled) await defaultOnSettled();
                 if (onSettled) await onSettled();
+                if (defaultOnSettled && !disableDefaultOnSettled) await defaultOnSettled();
             }
             if (onErrorRet !== undefined) return onErrorRet;
             if (defaultOnErrorRet !== undefined) return defaultOnErrorRet;
@@ -162,36 +162,43 @@ export function createZFetcher(config: ZFetcherConfig) {
             }
 
             const beforeHandle = processedBody;
+            let didTransform = false;
             if (response.ok) {
-                if (defaultOnSuccess && !disableDefaultOnSuccess) {
-                    const handledValue = await defaultOnSuccess(response, beforeHandle);
-                    if (handledValue !== undefined) {
-                        processedBody = handledValue
-                    }
-                }
                 if (onSuccess) {
                     const handledValue = await onSuccess(response, beforeHandle);
                     if (handledValue !== undefined) {
                         processedBody = handledValue
+                        didTransform = true
+                    }
+                }
+                if (defaultOnSuccess && !disableDefaultOnSuccess) {
+                    const handledValue = await defaultOnSuccess(response, beforeHandle);
+                    if (handledValue !== undefined && !didTransform) {
+                        // default(global) callback take control iff 
+                        // value returned and per-request callback did not
+                        processedBody = handledValue
+                        didTransform = true
                     }
                 }
             } else {
-                if (defaultOnNotOk && !disableDefaultOnNotOk) {
-                    const handledValue = await defaultOnNotOk(response, beforeHandle);
-                    if (handledValue !== undefined) {
-                        processedBody = handledValue
-                    }
-                }
                 if (onNotOk) {
                     const handledValue = await onNotOk(response, beforeHandle);
                     if (handledValue !== undefined) {
                         processedBody = handledValue
+                        didTransform = true
+                    }
+                }
+                if (defaultOnNotOk && !disableDefaultOnNotOk) {
+                    const handledValue = await defaultOnNotOk(response, beforeHandle);
+                    if (handledValue !== undefined && !didTransform) {
+                        processedBody = handledValue
+                        didTransform = true
                     }
                 }
             }
         } finally {
-            if (defaultOnSettled && !disableDefaultOnSettled) await defaultOnSettled();
             if (onSettled) await onSettled();
+            if (defaultOnSettled && !disableDefaultOnSettled) await defaultOnSettled();
         }
 
         if (!response.ok && throwNotOk) {
