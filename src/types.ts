@@ -13,31 +13,35 @@ export type RequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
  */
 export interface LifecycleHooks {
     /**
-     * Invoked before the request is sent.
-     * Useful for logging
+     * Called before the request is sent.
      */
     onPrep?: () => Promise<void> | void;
 
     /**
-     * Invoked when the request completes successfully (HTTP 2xx).
-     * Return a value to transform the response body.
+     * Called when the response is successful (2xx).
+     * Returning a value replaces the original response body.
+     * Throwing propagates immediately.
      */
     onSuccess?: (response: Response, body: unknown) => Promise<unknown | void> | unknown | void;
 
     /**
-     * Invoked when the response status is not OK (non-2xx).
-     * Return a value to transform the response body.
+     * Called when the response is not OK (non-2xx).
+     * If `throwNotOk` is false, returning a value replaces the original response body
+     * Throwing bypasses `throwNotOk` and propagates immediately.
      */
     onNotOk?: (response: Response, body: unknown) => Promise<unknown | void> | unknown | void;
 
     /**
-     * Invoked when an error occurs during the request or response handling.
-     * Return a value to prevent the error from being thrown and use that value as the response.
+     * Called on network or Fetch API errors.
+     * Returning a value prevents the error from propagating.
+     * Returning `undefined` propagates the original error.
+     * Throwing propagates immediately.
      */
     onError?: (error: unknown) => Promise<unknown> | unknown;
 
     /**
-     * Invoked after the request lifecycle completes, regardless of outcome.
+     * Always called after the request completes,
+     * regardless of success, failure, or error.
      */
     onSettled?: () => Promise<void> | void;
 }
@@ -65,7 +69,7 @@ export interface ZFetcherConfig extends LifecycleHooks {
     /**
      * Automatically normalizes URLs by ensuring proper slashes.
      * If disabled, url, path, and query params are concatenated literally.
-     * @default false
+     * @default true
      */
     normalizeUrl?: boolean;
 
@@ -76,18 +80,18 @@ export interface ZFetcherConfig extends LifecycleHooks {
     throwNotOk?: boolean;
 
     /**
-     * Headers that will always be attached to each request unless explicitly disabled.
+     * Headers attached to every request, can be disabled explicitly per request.
      */
     headers?: Record<string, string>;
 
     /**
-     * Query parameters that will always be appended to each request unless explicitly disabled.
+     * Query parameters appended to every request, can be disabled explicitly per request.
      */
     queryParams?: Record<string, string | number | boolean | any>;
 
     /**
-     * Default Fetch API options applied to every request unless explicitly disabled.
-     * default { credentials: "include" }
+     * Default Fetch API options applied to every request, can be disabled explicitly per request.
+     * @default { credentials: "include" }
      */
     fetchOptions?: Omit<RequestInit, 'headers'>;
 }
